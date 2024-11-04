@@ -41,7 +41,6 @@ async function summarizePolicy(termsText) {
 
       console.log(`Summarizing chunk ${i + 1} of ${numChunks}...`);
 
-      // Make the OpenAI API request
       const completion = await openai.chat.completions.create({
         model: model,
         messages: [
@@ -52,18 +51,42 @@ async function summarizePolicy(termsText) {
           },
           {
             role: "user",
-            content: `You are a legal expert reviewing a Terms of Use document. 
-              Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk. 
-              Focus on sections that may negatively impact user rights or privacy, such as:
-              - **Data Collection**: Any invasive or excessive data collection practices.
-              - **Data Usage**: Any use of data that could compromise privacy or security.
-              - **Data Sharing**: Sharing data with third parties that may violate user expectations.
-              - **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
-              - **Retention**: Terms that involve retaining user data for an unusually long time.
-              - **Waiving Rights**: Any waivers of important legal rights.
-  
-              Ignore any benign or standard terms that are commonly acceptable. Summarize only the concerning parts in the chunk below:
-              ${chunk}`,
+            content: `You are a legal expert reviewing a Terms of Use document.
+      
+      Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk.
+      
+      Focus on sections that may negatively impact user rights or privacy, such as:
+      
+      - **Data Collection**: Any invasive or excessive data collection practices.
+      - **Data Usage**: Any use of data that could compromise privacy or security.
+      - **Data Sharing**: Sharing data with third parties that may violate user expectations.
+      - **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
+      - **Retention**: Terms that involve retaining user data for an unusually long time.
+      - **Waiving Rights**: Any waivers of important legal rights.
+      
+      Ignore any benign or standard terms that are commonly acceptable.
+      
+      **Please provide your response in the following JSON format:**
+      
+      \`\`\`json
+      {
+        "concerns": [
+          {
+            "section": "Data Collection",
+            "description": "Description of the concern."
+          },
+          {
+            "section": "Data Usage",
+            "description": "Description of the concern."
+          }
+          // ...other concerns
+        ]
+      }
+      \`\`\`
+      
+      Here is the chunk to analyze:
+      
+      ${chunk}`,
           },
         ],
         max_tokens: maxOutputTokens,
