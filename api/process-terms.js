@@ -78,41 +78,45 @@ async function summarizePolicy(termsText) {
     return concernsList; // Return the list of concerns for all chunks
   } catch (error) {
     console.error('Error with OpenAI API:', error);
-    throw new Error('Failed to summarize the Terms of Use');
+    // Pass the actual error message back
+    throw new Error(error.response?.data?.error?.message || error.message || 'Failed to summarize the Terms of Use');
+
   }
 }
 
-// The serverless function handler
 export default async function handler(req, res) {
-  // Enable CORS
-  res.setHeader('Access-Control-Allow-Origin', '*'); // You can restrict this to your extension's origin
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end(); // Handle preflight request
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { termsContent } = req.body;
-
-    if (!termsContent || termsContent.trim() === '') {
-      return res.status(400).json({ error: 'No Terms of Use content provided' });
+    // Enable CORS
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Adjust as needed
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end(); // Handle preflight request
     }
-
-    console.log('Received Terms of Use content:', termsContent);
-
-    // Summarize the content using OpenAI
-    const concerns = await summarizePolicy(termsContent);
-
-    // Send back the structured concerns
-    res.status(200).json({ concerns });
-  } catch (error) {
-    console.error('Error processing Terms of Use:', error);
-    res.status(500).json({ error: error.message });
-  }
-}
+  
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+  
+    try {
+      const { termsContent } = req.body;
+  
+      if (!termsContent || termsContent.trim() === '') {
+        console.error('No Terms of Use content provided');
+        return res.status(400).json({ error: 'No Terms of Use content provided' });
+      }
+  
+      console.log('Received Terms of Use content:', termsContent);
+  
+      // Summarize the content using OpenAI
+      const concerns = await summarizePolicy(termsContent);
+  
+      // Send back the structured concerns
+      res.status(200).json({ concerns });
+    } catch (error) {
+      console.error('Error processing Terms of Use:', error);
+  
+      // Ensure error is returned as JSON
+      res.status(500).json({ error: error.message || 'Internal Server Error' });
+    }
+  }  
