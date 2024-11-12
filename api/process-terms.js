@@ -52,22 +52,32 @@ async function summarizePolicy(termsText) {
           },
           {
             role: "user",
-            content: `You are a legal expert reviewing a Terms of Use document. 
-Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk. 
+            content: `You are a legal expert reviewing a Terms of Use document.
+
+Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk.
+
 Focus on sections that may negatively impact user rights or privacy, such as:
 
 - **Data Collection**: Any invasive or excessive data collection practices.
 - **Data Usage**: Any use of data that could compromise privacy or security.
 - **Data Sharing**: Sharing data with third parties that may violate user expectations.
 - **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
-- **Retention**: Terms that involve retaining user data for an unusually long time.
+- **Limitation of Liability**: Clauses that unfairly limit the company's liability or set low maximum damages.
+- **Indemnification**: Requirements for users to indemnify the company in ways that may be overly burdensome.
+- **Dispute Resolution**: Mandatory arbitration clauses, class action waivers, or terms that limit legal recourse.
+- **Governing Law and Jurisdiction**: Terms requiring users to submit to unfavorable laws or jurisdictions.
+- **Retention**: Terms involving retaining user data for an unusually long time.
 - **Waiving Rights**: Any waivers of important legal rights.
 
+For each concern, provide:
+
+- **Section Name**: Brief description of the concern, referencing specific clauses or language from the text when appropriate.
+
+**Example:**
+
+- **Limitation of Liability**: The Terms limit the company's total liability to $1,000, which may not cover potential damages. For example, it states: "IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU FOR ALL DAMAGES... EXCEED ONE THOUSAND U.S. DOLLARS (US $1,000)."
+
 Ignore any benign or standard terms that are commonly acceptable.
-
-**Please respond with the following format for each concern (omit sections with no concerns):**
-
-- **Section Name**: Description of the concern.
 
 Chunk:
 
@@ -75,7 +85,7 @@ ${chunk}`,
           },
         ],
         max_tokens: maxOutputTokens,
-        temperature: 0.7,
+        temperature: 0.5,
       });
 
       // Extract the completion content
