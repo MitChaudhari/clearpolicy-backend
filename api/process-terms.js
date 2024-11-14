@@ -14,15 +14,15 @@ const charsToTokens = (chars) => Math.ceil(chars / 4);
 
 // Token limits for each model
 const TOKEN_LIMITS = {
-  "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 }, // GPT-4o-mini
-  "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 }, // Updated GPT-4o version
+  "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 },
+  "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 },
 };
 
 // Function to summarize the Terms of Use or privacy policy
 async function summarizePolicy(termsText) {
   try {
-    const model = "gpt-4o-mini"; // You can choose the model version
-    const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model]; // Use token limits for the model
+    const model = "gpt-4o-mini"; // Choose the model version
+    const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model];
 
     // Calculate total tokens for the input text
     const totalTokens = charsToTokens(termsText.length);
@@ -48,7 +48,8 @@ async function summarizePolicy(termsText) {
           {
             role: "system",
             content:
-              "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+              "You are a legal expert specializing in identifying " +
+              "problematic clauses in Terms of Use documents.",
           },
           {
             role: "user",
@@ -110,9 +111,13 @@ ${chunk}`,
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust as needed
+  // Allow requests from Chrome extensions
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Access-Control-Allow-Headers"
+  );
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
@@ -139,6 +144,8 @@ export default async function handler(req, res) {
     res.status(200).json({ concerns });
   } catch (error) {
     console.error("Error processing Terms of Use:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+    res
+      .status(500)
+      .json({ error: error.message || "Internal Server Error" });
   }
 }
