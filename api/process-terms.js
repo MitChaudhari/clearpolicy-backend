@@ -1,6 +1,7 @@
 // api/process-terms.js
 
 import OpenAI from "openai";
+import NextCors from 'nextjs-cors';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -111,13 +112,13 @@ ${chunk}`,
 }
 
 export default async function handler(req, res) {
-  // Allow requests from Chrome extensions
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Access-Control-Allow-Headers"
-  );
+  // Run the CORS middleware
+  await NextCors(req, res, {
+    // Options
+    methods: ["POST", "OPTIONS"],
+    origin: "*", // You can restrict this to specific origins if needed
+    optionsSuccessStatus: 200,
+  });
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();

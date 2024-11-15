@@ -11,7 +11,7 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "nextjs-cors": "^2.2.0",
     "openai": "^4.0.0"
-  },
-  "devDependencies": {}
+  }
 }
