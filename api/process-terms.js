@@ -1,7 +1,6 @@
 // api/process-terms.js
 
 import OpenAI from "openai";
-import NextCors from 'nextjs-cors';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -112,20 +111,20 @@ ${chunk}`,
 }
 
 export default async function handler(req, res) {
-  // Run the CORS middleware
-  await NextCors(req, res, {
-    // Options
-    methods: ["POST", "OPTIONS"],
-    origin: "*", // You can restrict this to specific origins if needed
-    optionsSuccessStatus: 200,
-  });
+  // Set CORS headers for all responses
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") {
-    return res.status(200).end();
+    // Handle preflight OPTIONS request
+    res.status(204).end();
+    return;
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    res.status(405).json({ error: "Method not allowed" });
+    return;
   }
 
   try {
@@ -133,12 +132,11 @@ export default async function handler(req, res) {
 
     if (!termsContent || termsContent.trim() === "") {
       console.error("No Terms of Use content provided");
-      return res
-        .status(400)
-        .json({ error: "No Terms of Use content provided" });
+      res.status(400).json({ error: "No Terms of Use content provided" });
+      return;
     }
 
-    console.log("Received Terms of Use content:", termsContent);
+    console.log("Received Terms of Use content.");
 
     const concerns = await summarizePolicy(termsContent);
 
