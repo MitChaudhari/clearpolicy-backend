@@ -4,7 +4,12 @@ import OpenAI from "openai";
 
 if (!process.env.OPENAI_API_KEY) {
   console.error("Error: OPENAI_API_KEY is not set in environment variables.");
-  throw new Error("OPENAI_API_KEY is not set.");
+  // Set CORS headers for error response
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.status(500).json({ error: "OPENAI_API_KEY is not set." });
+  return;
 }
 
 const openai = new OpenAI({
@@ -98,11 +103,7 @@ ${chunk}`;
       "Error with OpenAI API:",
       error.response?.data || error.message || error
     );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        error.message ||
-        "Failed to summarize the Terms of Use"
-    );
+    throw error; // Re-throw the error to be caught in the handler
   }
 }
 
@@ -139,6 +140,14 @@ export default async function handler(req, res) {
     res.status(200).json({ concerns });
   } catch (error) {
     console.error("Error processing Terms of Use:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+
+    // Ensure CORS headers are set on error responses
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+    res
+      .status(500)
+      .json({ error: error.message || "Internal Server Error" });
   }
 }
