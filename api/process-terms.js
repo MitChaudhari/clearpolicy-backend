@@ -1,7 +1,7 @@
 // api/process-terms.js
 
 import OpenAI from "openai";
-import { encoding_for_model } from "tiktoken";
+import { encoding_for_model, get_encoding } from "tiktoken";
 
 if (!process.env.OPENAI_API_KEY) {
   console.error("Error: OPENAI_API_KEY is not set in environment variables.");
@@ -25,7 +25,14 @@ async function summarizePolicy(termsText) {
     const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model];
 
     // Initialize the tokenizer for the specified model
-    const tokenizer = encoding_for_model(model);
+    let tokenizer;
+    try {
+      tokenizer = encoding_for_model(model);
+    } catch (e) {
+      console.warn(`Tokenizer for model "${model}" not found. Using default tokenizer.`);
+      // Use a default tokenizer if the model is not recognized
+      tokenizer = get_encoding("cl100k_base");
+    }
 
     // Tokenize the input text
     const tokens = tokenizer.encode(termsText);
@@ -33,7 +40,7 @@ async function summarizePolicy(termsText) {
     console.log(`Total tokens in input text: ${totalTokens}`);
 
     // Determine how many chunks are needed based on the context window
-    const maxInputTokens = contextWindow - maxOutputTokens - 500; // Reserve tokens for the prompt and response
+    const maxInputTokens = contextWindow - maxOutputTokens - 2000; // Reserve tokens for the prompt and response
     const numChunks = Math.ceil(totalTokens / maxInputTokens);
     console.log(`Number of chunks: ${numChunks}`);
 
@@ -48,19 +55,14 @@ async function summarizePolicy(termsText) {
 
       console.log(`Summarizing chunk ${i + 1} of ${numChunks}...`);
 
-      // Make the OpenAI API request
-      console.log("Making OpenAI API request with model:", model);
-      const completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
-          },
-          {
-            role: "user",
-            content: `You are a legal expert reviewing a Terms of Use document.
+      // Prepare the messages
+      const systemMessage = {
+        role: "system",
+        content:
+          "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+      };
+
+      const userMessageContent = `You are a legal expert reviewing a Terms of Use document.
 
 Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk.
 
@@ -95,9 +97,27 @@ Ignore any benign or standard terms that are commonly acceptable.
 
 Chunk:
 
-${chunk}`,
-          },
-        ],
+${chunk}`;
+
+      // Tokenize the messages to ensure they fit within the context window
+      const messages = [systemMessage, { role: "user", content: userMessageContent }];
+      let messageTokens = 0;
+      for (const message of messages) {
+        messageTokens += tokenizer.encode(message.content).length;
+      }
+
+      if (messageTokens > contextWindow) {
+        console.error("Messages exceed the model's maximum context length.");
+        continue; // Skip this chunk
+      }
+
+      console.log("Total tokens for this message:", messageTokens);
+
+      // Make the OpenAI API request
+      console.log("Making OpenAI API request with model:", model);
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: messages,
         max_tokens: maxOutputTokens,
         temperature: 0.5,
       });
