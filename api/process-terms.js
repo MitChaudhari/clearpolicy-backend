@@ -1,7 +1,6 @@
 // api/process-terms.js
 
 import OpenAI from "openai";
-import { encoding_for_model, get_encoding } from "tiktoken";
 
 if (!process.env.OPENAI_API_KEY) {
   console.error("Error: OPENAI_API_KEY is not set in environment variables.");
@@ -18,42 +17,25 @@ const TOKEN_LIMITS = {
   "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 },
 };
 
-// Function to summarize the Terms of Use or privacy policy
+// Function to summarize the Terms of Use or Privacy Policy
 async function summarizePolicy(termsText) {
   try {
     const model = "gpt-4o-mini"; // Use the specified model
-    const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model];
+    const { maxOutputTokens } = TOKEN_LIMITS[model];
 
-    // Initialize the tokenizer for the specified model
-    let tokenizer;
-    try {
-      tokenizer = encoding_for_model(model);
-    } catch (e) {
-      console.warn(
-        `Tokenizer for model "${model}" not found. Using default tokenizer.`
-      );
-      // Use a default tokenizer if the model is not recognized
-      tokenizer = get_encoding("o200k_base");
-    }
+    const chunkSize = 31750; // Use the same chunk size as in scraper.js
 
-    // Tokenize the input text
-    const tokens = tokenizer.encode(termsText);
-    const totalTokens = tokens.length;
-    console.log(`Total tokens in input text: ${totalTokens}`);
-
-    // Determine how many chunks are needed based on the context window
-    const maxInputTokens = contextWindow - maxOutputTokens - 2000; // Reserve tokens for the prompt and response
-    const numChunks = Math.ceil(totalTokens / maxInputTokens);
+    // Split the termsText into chunks
+    const numChunks = Math.ceil(termsText.length / chunkSize);
     console.log(`Number of chunks: ${numChunks}`);
 
     let concernsList = [];
 
     // Split the text into chunks and make multiple API calls
     for (let i = 0; i < numChunks; i++) {
-      const start = i * maxInputTokens;
-      const end = Math.min(start + maxInputTokens, tokens.length);
-      const chunkTokens = tokens.slice(start, end);
-      const chunk = tokenizer.decode(chunkTokens);
+      const start = i * chunkSize;
+      const end = Math.min(start + chunkSize, termsText.length);
+      const chunk = termsText.slice(start, end);
 
       console.log(`Summarizing chunk ${i + 1} of ${numChunks}...`);
 
@@ -81,42 +63,16 @@ Focus on sections that may negatively impact user rights or privacy, such as:
 - Retention: Terms involving retaining user data for an unusually long time.
 - Waiving Rights: Any waivers of important legal rights.
 
-For each concern, provide a JSON array of objects with the following structure:
-
-\`\`\`json
-[
-  {
-    "title": "Section Name",
-    "description": "Brief description of the concern, referencing specific clauses or language from the text when appropriate."
-  },
-  // ... more concerns
-]
-\`\`\`
-
-Ensure the entire response is valid JSON and does not contain any extraneous text.
-
 Ignore any benign or standard terms that are commonly acceptable.
 
 Chunk:
 
 ${chunk}`;
 
-      // Tokenize the messages to ensure they fit within the context window
       const messages = [
         systemMessage,
         { role: "user", content: userMessageContent },
       ];
-      let messageTokens = 0;
-      for (const message of messages) {
-        messageTokens += tokenizer.encode(message.content).length;
-      }
-
-      if (messageTokens > contextWindow) {
-        console.error("Messages exceed the model's maximum context length.");
-        continue; // Skip this chunk
-      }
-
-      console.log("Total tokens for this message:", messageTokens);
 
       // Make the OpenAI API request
       console.log("Making OpenAI API request with model:", model);
@@ -131,23 +87,8 @@ ${chunk}`;
       const chunkConcernsText = completion.choices[0].message.content.trim();
       console.log("Received GPT output:", chunkConcernsText);
 
-      // Try to parse the GPT output as JSON
-      let chunkConcerns;
-      try {
-        // Extract JSON from code block
-        const jsonMatch = chunkConcernsText.match(/```json\s*([\s\S]*?)```/);
-        const jsonString = jsonMatch ? jsonMatch[1] : chunkConcernsText;
-
-        chunkConcerns = JSON.parse(jsonString);
-        if (Array.isArray(chunkConcerns)) {
-          concernsList = concernsList.concat(chunkConcerns);
-        } else {
-          console.error("Chunk concerns is not an array:", chunkConcerns);
-        }
-      } catch (parseError) {
-        console.error("Failed to parse chunk concerns as JSON:", parseError);
-        console.error("GPT output was:", chunkConcernsText);
-      }
+      // Collect the outputs as is
+      concernsList.push(chunkConcernsText);
     }
 
     console.log("Final concerns list:", concernsList);
