@@ -59,24 +59,25 @@ Please identify and summarize only the problematic or concerning sections of the
 
 Focus on sections that may negatively impact user rights or privacy, such as:
 
-- **Data Collection**: Any invasive or excessive data collection practices.
-- **Data Usage**: Any use of data that could compromise privacy or security.
-- **Data Sharing**: Sharing data with third parties that may violate user expectations.
-- **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
-- **Limitation of Liability**: Clauses that unfairly limit the company's liability or set low maximum damages.
-- **Indemnification**: Requirements for users to indemnify the company in ways that may be overly burdensome.
-- **Dispute Resolution**: Mandatory arbitration clauses, class action waivers, or terms that limit legal recourse.
-- **Governing Law and Jurisdiction**: Terms requiring users to submit to unfavorable laws or jurisdictions.
-- **Retention**: Terms involving retaining user data for an unusually long time.
-- **Waiving Rights**: Any waivers of important legal rights.
+- Data Collection: Any invasive or excessive data collection practices.
+- Data Usage: Any use of data that could compromise privacy or security.
+- Data Sharing: Sharing data with third parties that may violate user expectations.
+- User Rights: Clauses that limit user rights or impose unreasonable restrictions.
+- Limitation of Liability: Clauses that unfairly limit the company's liability or set low maximum damages.
+- Indemnification: Requirements for users to indemnify the company in ways that may be overly burdensome.
+- Dispute Resolution: Mandatory arbitration clauses, class action waivers, or terms that limit legal recourse.
+- Governing Law and Jurisdiction: Terms requiring users to submit to unfavorable laws or jurisdictions.
+- Retention: Terms involving retaining user data for an unusually long time.
+- Waiving Rights: Any waivers of important legal rights.
 
-For each concern, provide:
+For each concern, provide a JSON object with the following structure:
 
-- **Section Name**: Brief description of the concern, referencing specific clauses or language from the text when appropriate.
+{
+  "title": "Section Name",
+  "description": "Brief description of the concern, referencing specific clauses or language from the text when appropriate."
+}
 
-**Example:**
-
-- **Limitation of Liability**: The Terms limit the company's total liability to $1,000, which may not cover potential damages. For example, it states: "IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU FOR ALL DAMAGES... EXCEED ONE THOUSAND U.S. DOLLARS (US $1,000)."
+Provide a JSON array of such objects.
 
 Ignore any benign or standard terms that are commonly acceptable.
 
@@ -90,10 +91,21 @@ ${chunk}`,
       });
 
       // Extract the completion content
-      const chunkConcerns = completion.choices[0].message.content.trim();
+      const chunkConcernsText = completion.choices[0].message.content.trim();
 
-      // Add the concerns to the list
-      concernsList.push(chunkConcerns);
+      // Try to parse the GPT output as JSON
+      let chunkConcerns;
+      try {
+        chunkConcerns = JSON.parse(chunkConcernsText);
+        if (Array.isArray(chunkConcerns)) {
+          concernsList = concernsList.concat(chunkConcerns);
+        } else {
+          console.error("Chunk concerns is not an array:", chunkConcerns);
+        }
+      } catch (parseError) {
+        console.error("Failed to parse chunk concerns as JSON:", parseError);
+        console.error("GPT output was:", chunkConcernsText);
+      }
     }
 
     return concernsList; // Return the list of concerns for all chunks
