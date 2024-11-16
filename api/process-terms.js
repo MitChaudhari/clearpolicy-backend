@@ -29,9 +29,11 @@ async function summarizePolicy(termsText) {
     try {
       tokenizer = encoding_for_model(model);
     } catch (e) {
-      console.warn(`Tokenizer for model "${model}" not found. Using default tokenizer.`);
+      console.warn(
+        `Tokenizer for model "${model}" not found. Using default tokenizer.`
+      );
       // Use a default tokenizer if the model is not recognized
-      tokenizer = get_encoding("cl100k_base");
+      tokenizer = get_encoding("o200k_base");
     }
 
     // Tokenize the input text
@@ -100,7 +102,10 @@ Chunk:
 ${chunk}`;
 
       // Tokenize the messages to ensure they fit within the context window
-      const messages = [systemMessage, { role: "user", content: userMessageContent }];
+      const messages = [
+        systemMessage,
+        { role: "user", content: userMessageContent },
+      ];
       let messageTokens = 0;
       for (const message of messages) {
         messageTokens += tokenizer.encode(message.content).length;
@@ -193,8 +198,6 @@ export default async function handler(req, res) {
     res.status(200).json({ concerns });
   } catch (error) {
     console.error("Error processing Terms of Use:", error);
-    res
-      .status(500)
-      .json({ error: error.message || "Internal Server Error" });
+    res.status(500).json({ error: error.message || "Internal Server Error" });
   }
 }
