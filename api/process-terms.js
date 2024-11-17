@@ -2,27 +2,88 @@
 
 import OpenAI from "openai";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-if (!process.env.OPENAI_API_KEY) {
-  console.error("Error: OPENAI_API_KEY is not set in environment variables.");
+// Helper function to set CORS headers
+function setCORSHeaders(res) {
+  const allowedOrigins = [
+    // List of allowed origins
+    "chrome-extension://occbnfdfebomfpfkbjdjbinecmljnmki",
+    "https://signup.com",
+    "https://disneytermsofuse.com",
+    "https://open.spotify.com",
+    "https://www.chase.com",
+    "https://promotions.bankofamerica.com",
+    "https://www.fidelity.com",
+  ];
+  const origin = res.req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "null"); // Or handle as needed
+  }
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-const charsToTokens = (chars) => Math.ceil(chars / 4);
+export default async function handler(req, res) {
+  // Set CORS headers
+  setCORSHeaders(res);
 
-// Token limits for each model
-const TOKEN_LIMITS = {
-  "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 }, // GPT-4o-mini
-  "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 }, // Updated GPT-4o version
-};
+  if (req.method === "OPTIONS") {
+    // Handle preflight OPTIONS request
+    res.status(200).end();
+    return;
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("Error: OPENAI_API_KEY is not set in environment variables.");
+    res.status(500).json({ error: "OPENAI_API_KEY is not set." });
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  try {
+    const { termsContent } = req.body;
+
+    if (!termsContent || termsContent.trim() === "") {
+      console.error("No Terms of Use content provided");
+      res.status(400).json({ error: "No Terms of Use content provided" });
+      return;
+    }
+
+    console.log("Received Terms of Use content.");
+
+    const concerns = await summarizePolicy(termsContent, openai);
+
+    res.status(200).json({ concerns });
+  } catch (error) {
+    console.error("Error processing Terms of Use:", error);
+
+    // Ensure CORS headers are set on error responses
+    setCORSHeaders(res);
+
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
+}
 
 // Function to summarize the Terms of Use or privacy policy
-async function summarizePolicy(termsText) {
+async function summarizePolicy(termsText, openai) {
   try {
-    const model = "gpt-4o-mini"; // You can choose the model version
-    const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model]; // Use token limits for the model
+    const model = "gpt-4o-mini"; // Use the specified model
+    const TOKEN_LIMITS = {
+      "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 },
+      "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 },
+    };
+    const { contextWindow, maxOutputTokens } = TOKEN_LIMITS[model];
+
+    const charsToTokens = (chars) => Math.ceil(chars / 4);
 
     // Calculate total tokens for the input text
     const totalTokens = charsToTokens(termsText.length);
@@ -41,18 +102,16 @@ async function summarizePolicy(termsText) {
 
       console.log(`Summarizing chunk ${i + 1} of ${numChunks}...`);
 
-      // Make the OpenAI API request
-      const completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
-          },
-          {
-            role: "user",
-            content:`You are a legal expert reviewing a Terms of Use document.
+      // Prepare the messages
+      const messages = [
+        {
+          role: "system",
+          content:
+            "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+        },
+        {
+          role: "user",
+          content: `You are a legal expert reviewing a Terms of Use document.
 
 Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk.
 
@@ -73,65 +132,34 @@ Ignore any benign or standard terms that are commonly acceptable.
 
 Chunk:
 
-
 ${chunk}`,
-          },
-        ],
+        },
+      ];
+
+      // Make the OpenAI API request
+      console.log("Making OpenAI API request with model:", model);
+      const completion = await openai.chat.completions.create({
+        model: model,
+        messages: messages,
         max_tokens: maxOutputTokens,
-        temperature: 0.7,
+        temperature: 0.5,
       });
 
       // Extract the completion content
-      const chunkConcerns = completion.choices[0].message.content.trim();
+      const chunkConcernsText = completion.choices[0].message.content.trim();
+      console.log("Received GPT output:", chunkConcernsText);
 
-      // Add the concerns to the list
-      concernsList.push(chunkConcerns);
+      // Collect the outputs as is
+      concernsList.push(chunkConcernsText);
     }
 
+    console.log("Final concerns list:", concernsList);
     return concernsList; // Return the list of concerns for all chunks
   } catch (error) {
     console.error(
       "Error with OpenAI API:",
       error.response?.data || error.message || error
     );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        error.message ||
-        "Failed to summarize the Terms of Use"
-    );
-  }
-}
-
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust as needed
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  try {
-    const { termsContent } = req.body;
-
-    if (!termsContent || termsContent.trim() === "") {
-      console.error("No Terms of Use content provided");
-      return res
-        .status(400)
-        .json({ error: "No Terms of Use content provided" });
-    }
-
-    console.log("Received Terms of Use content:", termsContent);
-
-    const concerns = await summarizePolicy(termsContent);
-
-    res.status(200).json({ concerns });
-  } catch (error) {
-    console.error("Error processing Terms of Use:", error);
-    res.status(500).json({ error: error.message || "Internal Server Error" });
+    throw error; // Re-throw the error to be caught in the handler
   }
 }
