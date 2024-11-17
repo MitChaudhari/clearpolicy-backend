@@ -98,11 +98,31 @@ ${chunk}`,
     );
   }
 }
-
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust as needed
+// Helper function to set CORS headers
+function setCORSHeaders(res) {
+  const allowedOrigins = [
+    // List of allowed origins
+    "chrome-extension://occbnfdfebomfpfkbjdjbinecmljnmki",
+    "https://signup.com",
+    "https://disneytermsofuse.com",
+    "https://open.spotify.com",
+    "https://www.chase.com",
+    "https://promotions.bankofamerica.com",
+    "https://www.fidelity.com",
+  ];
+  const origin = res.req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", "null"); // Or handle as needed
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+export default async function handler(req, res) {
+  // Set CORS headers
+  setCORSHeaders(res);
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
