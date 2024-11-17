@@ -2,30 +2,62 @@
 
 import OpenAI from "openai";
 
-if (!process.env.OPENAI_API_KEY) {
-  console.error("Error: OPENAI_API_KEY is not set in environment variables.");
-  // Set CORS headers for error response
+export default async function handler(req, res) {
+  // Set CORS headers for all responses
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.status(500).json({ error: "OPENAI_API_KEY is not set." });
-  return;
+
+  if (req.method === "OPTIONS") {
+    // Handle preflight OPTIONS request
+    res.status(204).end();
+    return;
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("Error: OPENAI_API_KEY is not set in environment variables.");
+    res.status(500).json({ error: "OPENAI_API_KEY is not set." });
+    return;
+  }
+
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const { termsContent } = req.body;
+
+    if (!termsContent || termsContent.trim() === "") {
+      console.error("No Terms of Use content provided");
+      res.status(400).json({ error: "No Terms of Use content provided" });
+      return;
+    }
+
+    console.log("Received Terms of Use content.");
+
+    const concerns = await summarizePolicy(termsContent, openai);
+
+    res.status(200).json({ concerns });
+  } catch (error) {
+    console.error("Error processing Terms of Use:", error);
+
+    res.status(500).json({ error: error.message || "Internal Server Error" });
+  }
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Token limits for each model
-const TOKEN_LIMITS = {
-  "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 },
-  "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 },
-};
-
 // Function to summarize the Terms of Use or Privacy Policy
-async function summarizePolicy(termsText) {
+async function summarizePolicy(termsText, openai) {
   try {
     const model = "gpt-4o-mini"; // Use the specified model
+    const TOKEN_LIMITS = {
+      "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 },
+      "gpt-4o-2024-08-06": { contextWindow: 128000, maxOutputTokens: 16384 },
+    };
     const { maxOutputTokens } = TOKEN_LIMITS[model];
 
     const chunkSize = 31750; // Use the same chunk size as in scraper.js
@@ -104,50 +136,5 @@ ${chunk}`;
       error.response?.data || error.message || error
     );
     throw error; // Re-throw the error to be caught in the handler
-  }
-}
-
-export default async function handler(req, res) {
-  // Set CORS headers for all responses
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-  if (req.method === "OPTIONS") {
-    // Handle preflight OPTIONS request
-    res.status(204).end();
-    return;
-  }
-
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Method not allowed" });
-    return;
-  }
-
-  try {
-    const { termsContent } = req.body;
-
-    if (!termsContent || termsContent.trim() === "") {
-      console.error("No Terms of Use content provided");
-      res.status(400).json({ error: "No Terms of Use content provided" });
-      return;
-    }
-
-    console.log("Received Terms of Use content.");
-
-    const concerns = await summarizePolicy(termsContent);
-
-    res.status(200).json({ concerns });
-  } catch (error) {
-    console.error("Error processing Terms of Use:", error);
-
-    // Ensure CORS headers are set on error responses
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
-    res
-      .status(500)
-      .json({ error: error.message || "Internal Server Error" });
   }
 }
