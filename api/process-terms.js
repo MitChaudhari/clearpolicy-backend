@@ -52,22 +52,36 @@ async function summarizePolicy(termsText) {
           },
           {
             role: "user",
-            content: `You are a legal expert reviewing a Terms of Use document. 
-Please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk. 
+            content: `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following Terms of Use chunk. For each concern, provide:
+
+- **Section**: The section name or number, if available.
+- **Quote**: The exact quote from the Terms that is concerning.
+- **Concern**: A brief explanation of why it is concerning.
+
 Focus on sections that may negatively impact user rights or privacy, such as:
 
-- **Data Collection**: Any invasive or excessive data collection practices.
-- **Data Usage**: Any use of data that could compromise privacy or security.
-- **Data Sharing**: Sharing data with third parties that may violate user expectations.
-- **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
-- **Retention**: Terms that involve retaining user data for an unusually long time.
-- **Waiving Rights**: Any waivers of important legal rights.
+1. **Data Collection**: Any invasive or excessive data collection practices.
+2. **Data Usage**: Any use of data that could compromise privacy or security.
+3. **Data Sharing**: Sharing data with third parties that may violate user expectations.
+4. **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
+5. **Retention**: Terms that involve retaining user data for an unusually long time.
+6. **Waiving Rights**: Any waivers of important legal rights.
+7. **Limitation of Liability**: Clauses that excessively limit the company's liability.
+8. **Mandatory Arbitration**: Terms that require arbitration and limit legal recourse.
+9. **Unilateral Changes**: Terms allowing the company to change the agreement without notice.
 
 Ignore any benign or standard terms that are commonly acceptable.
 
-**Please respond with the following format for each concern (omit sections with no concerns):**
+**Please respond in JSON format as an array of concerns. Example:**
 
-- **Section Name**: Description of the concern.
+[
+  {
+    "section": "Section 4.2",
+    "quote": "We reserve the right to share your data with third parties without your consent.",
+    "concern": "Allows data sharing without user consent, violating privacy expectations."
+  },
+  ...
+]
 
 Chunk:
 
