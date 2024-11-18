@@ -202,19 +202,25 @@ function setCORSHeaders(res) {
     "https://promotions.bankofamerica.com",
     "https://www.fidelity.com",
   ];
-  const origin = res.req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  const origin = req.headers.origin;
+  console.log("Request origin:", origin);
+
+  if (
+    allowedOrigins.includes(origin) ||
+    origin === `chrome-extension://${chrome.runtime.id}`
+  ) {
     res.setHeader("Access-Control-Allow-Origin", origin);
   } else {
     res.setHeader("Access-Control-Allow-Origin", "null"); // Or handle as needed
   }
+
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 export default async function handler(req, res) {
   // Set CORS headers
-  setCORSHeaders(res);
+  setCORSHeaders(req, res);
 
   if (req.method === "OPTIONS") {
     return res.status(200).end();
