@@ -71,72 +71,89 @@ async function summarizePolicy(termsText) {
 
 // Function to process a single chunk of text
 async function processChunk(chunkText, model, maxOutputTokens, chunkNumber = null) {
-  // Prepare the prompt
-  const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following ${
-    chunkNumber ? `chunk ${chunkNumber} of the Terms of Use` : "Terms of Use"
-  }. For each concern, provide:
+  try {
+    // Prepare the prompt
+    const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following ${
+      chunkNumber ? `chunk ${chunkNumber} of the Terms of Use` : "Terms of Use"
+    }. For each concern, provide:
 
-- **Section**: The section name or number, if available.
-- **Quote**: The exact quote from the Terms that is concerning.
-- **Concern**: A brief explanation of why it is concerning.
+- "section": The section name or number, if available.
+- "quote": The exact quote from the Terms that is concerning.
+- "concern": A brief explanation of why it is concerning.
 
 Focus on sections that may negatively impact user rights or privacy, such as:
 
-1. **Data Collection**: Any invasive or excessive data collection practices.
-2. **Data Usage**: Any use of data that could compromise privacy or security.
-3. **Data Sharing**: Sharing data with third parties that may violate user expectations.
-4. **User Rights**: Clauses that limit user rights or impose unreasonable restrictions.
-5. **Retention**: Terms that involve retaining user data for an unusually long time.
-6. **Waiving Rights**: Any waivers of important legal rights.
-7. **Limitation of Liability**: Clauses that excessively limit the company's liability.
-8. **Mandatory Arbitration**: Terms that require arbitration and limit legal recourse.
-9. **Unilateral Changes**: Terms allowing the company to change the agreement without notice.
+1. Data Collection: Any invasive or excessive data collection practices.
+2. Data Usage: Any use of data that could compromise privacy or security.
+3. Data Sharing: Sharing data with third parties that may violate user expectations.
+4. User Rights: Clauses that limit user rights or impose unreasonable restrictions.
+5. Retention: Terms that involve retaining user data for an unusually long time.
+6. Waiving Rights: Any waivers of important legal rights.
+7. Limitation of Liability: Clauses that excessively limit the company's liability.
+8. Mandatory Arbitration: Terms that require arbitration and limit legal recourse.
+9. Unilateral Changes: Terms allowing the company to change the agreement without notice.
 
 Ignore any benign or standard terms that are commonly acceptable.
 
-**Please respond in JSON format as an array of concerns. Example:**
+**Important:** Only provide the JSON array in your response. Do not include any explanations or additional text.
+
+**Example response:**
 
 [
   {
     "section": "Section 4.2",
     "quote": "We reserve the right to share your data with third parties without your consent.",
     "concern": "Allows data sharing without user consent, violating privacy expectations."
-  },
-  ...
+  }
 ]
 
 ${chunkNumber ? `Chunk ${chunkNumber}` : "Terms of Use"}:
 
 ${chunkText}`;
 
-  // Make the OpenAI API request
-  const completion = await openai.chat.completions.create({
-    model: model,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
-      },
-      {
-        role: "user",
-        content: prompt,
-      },
-    ],
-    max_tokens: maxOutputTokens,
-    temperature: 0.7,
-  });
+    // Make the OpenAI API request
+    const completion = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: maxOutputTokens,
+      temperature: 0.0, // Set temperature to 0 for deterministic output
+    });
 
-  // Extract and parse the completion content
-  const responseContent = completion.choices[0].message.content.trim();
+    // Extract and parse the completion content
+    let responseContent = completion.choices[0].message.content.trim();
 
-  try {
-    const parsedConcerns = JSON.parse(responseContent);
-    return parsedConcerns;
-  } catch (parseError) {
-    console.error("Error parsing JSON from OpenAI response:", parseError);
-    console.error("Received content:", responseContent);
-    throw new Error("Failed to parse JSON from OpenAI response.");
+    console.log("OpenAI API response:", responseContent);
+
+    // Attempt to extract JSON from the response
+    const jsonMatch = responseContent.match(/\[.*\]/s);
+    if (jsonMatch) {
+      responseContent = jsonMatch[0];
+    } else {
+      console.error("No JSON array found in OpenAI response.");
+      throw new Error("Failed to extract JSON array from OpenAI response.");
+    }
+
+    try {
+      const parsedConcerns = JSON.parse(responseContent);
+      return parsedConcerns;
+    } catch (parseError) {
+      console.error("Error parsing JSON from OpenAI response:", parseError);
+      console.error("Received content:", responseContent);
+      throw new Error("Failed to parse JSON from OpenAI response.");
+    }
+  } catch (error) {
+    console.error("Error during processChunk:", error.response?.data || error.message || error);
+    throw error;
   }
 }
 
