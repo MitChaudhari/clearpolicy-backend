@@ -17,7 +17,7 @@ const TOKEN_LIMITS = {
   "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 }, // GPT-4o-mini
 };
 
-// Function to summarize the Terms of Use or privacy policy
+// Function to summarize the Terms of Use or Privacy Policy
 async function summarizePolicy(termsText) {
   try {
     const model = "gpt-4o-mini"; // Model version
@@ -191,28 +191,13 @@ ${chunk}`,
 }
 
 // Helper function to set CORS headers
-function setCORSHeaders(res) {
-  const allowedOrigins = [
-    // List of allowed origins
-    "chrome-extension://occbnfdfebomfpfkbjdjbinecmljnmki",
-    "https://signup.com",
-    "https://disneytermsofuse.com",
-    "https://open.spotify.com",
-    "https://www.chase.com",
-    "https://promotions.bankofamerica.com",
-    "https://www.fidelity.com",
-  ];
+function setCORSHeaders(req, res) {
+  // Access the Origin header from the request
   const origin = req.headers.origin;
   console.log("Request origin:", origin);
 
-  if (
-    allowedOrigins.includes(origin) ||
-    origin === `chrome-extension://${chrome.runtime.id}`
-  ) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else {
-    res.setHeader("Access-Control-Allow-Origin", "null"); // Or handle as needed
-  }
+  // Allow requests from any origin (or restrict as needed)
+  res.setHeader("Access-Control-Allow-Origin", "*");
 
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
