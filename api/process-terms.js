@@ -73,39 +73,31 @@ async function summarizePolicy(termsText) {
 async function processChunk(chunkText, model, maxOutputTokens, chunkNumber = null) {
   try {
     // Prepare the prompt
-    const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following ${
+    const prompt = `You are a legal expert reviewing a Terms of Use document. Please identify and summarize only the problematic or concerning sections of the following ${
       chunkNumber ? `chunk ${chunkNumber} of the Terms of Use` : "Terms of Use"
-    }. For each concern, provide:
+    }.
 
-- "section": The section name or number, if available.
-- "quote": The exact quote from the Terms that is concerning.
-- "concern": A brief explanation of why it is concerning.
+For each concern, provide:
+
+- 'Section': The section name or number, if available.
+- 'Quote': The exact quote from the Terms that is concerning.
+- 'Concern': A brief explanation of why it is concerning.
 
 Focus on sections that may negatively impact user rights or privacy, such as:
 
-1. Data Collection: Any invasive or excessive data collection practices.
-2. Data Usage: Any use of data that could compromise privacy or security.
-3. Data Sharing: Sharing data with third parties that may violate user expectations.
-4. User Rights: Clauses that limit user rights or impose unreasonable restrictions.
-5. Retention: Terms that involve retaining user data for an unusually long time.
-6. Waiving Rights: Any waivers of important legal rights.
-7. Limitation of Liability: Clauses that excessively limit the company's liability.
-8. Mandatory Arbitration: Terms that require arbitration and limit legal recourse.
-9. Unilateral Changes: Terms allowing the company to change the agreement without notice.
+Data Collection: Any invasive or excessive data collection practices.
 
-Ignore any benign or standard terms that are commonly acceptable.
+Data Usage: Any use of data that could compromise privacy or security.
 
-**Important:** Only provide the JSON array in your response. Do not include any explanations or additional text.
+Data Sharing: Sharing data with third parties that may violate user expectations.
 
-**Example response:**
+User Rights: Clauses that limit user rights or impose unreasonable restrictions.
 
-[
-  {
-    "section": "Section 4.2",
-    "quote": "We reserve the right to share your data with third parties without your consent.",
-    "concern": "Allows data sharing without user consent, violating privacy expectations."
-  }
-]
+Retention: Terms that involve retaining user data for an unusually long time.
+
+Waiving Rights: Any waivers of important legal rights.
+
+Ignore any benign or standard terms that are commonly acceptable. Summarize only the concerning parts in the chunk below:
 
 ${chunkNumber ? `Chunk ${chunkNumber}` : "Terms of Use"}:
 
@@ -129,56 +121,79 @@ ${chunkText}`;
       temperature: 0.0, // Set temperature to 0 for deterministic output
     });
 
-    // Extract and parse the completion content
+    // Extract the completion content
     let responseContent = completion.choices[0].message.content.trim();
 
     console.log("OpenAI API response:", responseContent);
 
-    // Attempt to extract JSON from the response
-    const jsonMatch = responseContent.match(/\[.*\]/s);
-    if (jsonMatch) {
-      responseContent = jsonMatch[0];
-    } else {
-      console.error("No JSON array found in OpenAI response.");
-      throw new Error("Failed to extract JSON array from OpenAI response.");
-    }
+    // Parse the response content to extract concerns
+    const parsedConcerns = parseConcernsFromResponse(responseContent);
 
-    try {
-      const parsedConcerns = JSON.parse(responseContent);
-      return parsedConcerns;
-    } catch (parseError) {
-      console.error("Error parsing JSON from OpenAI response:", parseError);
-      console.error("Received content:", responseContent);
-      throw new Error("Failed to parse JSON from OpenAI response.");
-    }
+    return parsedConcerns;
   } catch (error) {
-    console.error("Error during processChunk:", error.response?.data || error.message || error);
+    console.error(
+      "Error during processChunk:",
+      error.response?.data || error.message || error
+    );
     throw error;
   }
 }
 
+// Function to parse concerns from GPT's response
+function parseConcernsFromResponse(responseContent) {
+  const concerns = [];
+  // Split the response into concern blocks
+  const concernBlocks = responseContent.split(/^\d+\.\s+/gm);
+
+  for (let block of concernBlocks) {
+    block = block.trim();
+    if (!block) continue;
+
+    const concern = {};
+
+    // Extract 'Section'
+    const sectionMatch = block.match(/Section:\s*(.*)/i);
+    if (sectionMatch) {
+      concern.section = sectionMatch[1].trim();
+    }
+
+    // Extract 'Quote'
+    const quoteMatch = block.match(/Quote:\s*([\s\S]*?)(?=Concern:|$)/i);
+    if (quoteMatch) {
+      concern.quote = quoteMatch[1].trim();
+    }
+
+    // Extract 'Concern'
+    const concernMatch = block.match(/Concern:\s*([\s\S]*)/i);
+    if (concernMatch) {
+      concern.concern = concernMatch[1].trim();
+    }
+
+    if (Object.keys(concern).length > 0) {
+      concerns.push(concern);
+    }
+  }
+
+  return concerns;
+}
+
 // Helper function to set CORS headers
-function setCORSHeaders(req, res) {
-  // Access the Origin header from the request
-  const origin = req.headers.origin || "*";
-  console.log("Request origin:", origin);
-
-  // Allow requests from any origin (or restrict as needed)
-  res.setHeader("Access-Control-Allow-Origin", "*");
-
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+function setCORSHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // Or specify your extension ID
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 export default async function handler(req, res) {
+  // Set CORS headers for all responses
+  setCORSHeaders(res);
+
+  if (req.method === "OPTIONS") {
+    // Handle preflight requests
+    return res.status(200).end();
+  }
+
   try {
-    // Set CORS headers
-    setCORSHeaders(req, res);
-
-    if (req.method === "OPTIONS") {
-      return res.status(200).end();
-    }
-
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
     }
@@ -199,10 +214,6 @@ export default async function handler(req, res) {
     res.status(200).json({ concerns });
   } catch (error) {
     console.error("Error processing Terms of Use:", error);
-
-    // Ensure CORS headers are set before sending error response
-    setCORSHeaders(req, res);
-
     res.status(500).json({ error: error.message || "Internal Server Error" });
   }
 }
