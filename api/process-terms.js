@@ -97,6 +97,8 @@ Ignore any benign or standard terms that are commonly acceptable.
 
 **Important:** Only provide the JSON array in your response. Do not include any explanations or additional text.
 
+**Ensure the JSON is properly formatted and valid.**
+
 **Example response:**
 
 [
@@ -148,37 +150,63 @@ ${chunkText}`;
       return parsedConcerns;
     } catch (parseError) {
       console.error("Error parsing JSON from OpenAI response:", parseError);
-      console.error("Received content:", responseContent);
-      throw new Error("Failed to parse JSON from OpenAI response.");
+      console.error("Attempting to fix JSON...");
+      // Try to fix the JSON
+      const fixedJSON = fixJSON(responseContent);
+      if (fixedJSON) {
+        return fixedJSON;
+      } else {
+        throw new Error("Failed to parse and fix JSON from OpenAI response.");
+      }
     }
   } catch (error) {
-    console.error("Error during processChunk:", error.response?.data || error.message || error);
+    console.error(
+      "Error during processChunk:",
+      error.response?.data || error.message || error
+    );
     throw error;
   }
 }
 
+// Function to attempt to fix malformed JSON
+function fixJSON(jsonString) {
+  try {
+    // Remove any trailing characters after the JSON array
+    const jsonArrayString = jsonString.match(/\[.*\]/s)[0];
+
+    // Replace smart quotes with regular quotes
+    const sanitizedString = jsonArrayString
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'");
+
+    // Remove any invalid control characters
+    const cleanedString = sanitizedString.replace(/[\u0000-\u001F]+/g, "");
+
+    const parsedJSON = JSON.parse(cleanedString);
+    return parsedJSON;
+  } catch (error) {
+    console.error("Failed to fix JSON:", error);
+    return null;
+  }
+}
+
 // Helper function to set CORS headers
-function setCORSHeaders(req, res) {
-  // Access the Origin header from the request
-  const origin = req.headers.origin || "*";
-  console.log("Request origin:", origin);
-
-  // Allow requests from any origin (or restrict as needed)
-  res.setHeader("Access-Control-Allow-Origin", "*");
-
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+function setCORSHeaders(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*"); // Or specify your extension ID
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 export default async function handler(req, res) {
+  // Set CORS headers for all responses
+  setCORSHeaders(res);
+
+  if (req.method === "OPTIONS") {
+    // Handle preflight requests
+    return res.status(200).end();
+  }
+
   try {
-    // Set CORS headers
-    setCORSHeaders(req, res);
-
-    if (req.method === "OPTIONS") {
-      return res.status(200).end();
-    }
-
     if (req.method !== "POST") {
       return res.status(405).json({ error: "Method not allowed" });
     }
@@ -199,10 +227,6 @@ export default async function handler(req, res) {
     res.status(200).json({ concerns });
   } catch (error) {
     console.error("Error processing Terms of Use:", error);
-
-    // Ensure CORS headers are set before sending error response
-    setCORSHeaders(req, res);
-
     res.status(500).json({ error: error.message || "Internal Server Error" });
   }
 }
