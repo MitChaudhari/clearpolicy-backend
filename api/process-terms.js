@@ -73,27 +73,27 @@ async function summarizePolicy(termsText) {
 async function processChunk(chunkText, model, maxOutputTokens, chunkNumber = null) {
   try {
     // Prepare the prompt
-    const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following ${
+    const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the severely problematic or concerning sections of the following ${
       chunkNumber ? `chunk ${chunkNumber} of the Terms of Use` : "Terms of Use"
-    }. For each concern, provide:
+    }. Focus only on violations that are so severe they could likely change a user's decision to sign up for the product or use it. For each concern, provide:
 
 - "section": The section name or number, if available.
 - "quote": The exact quote from the Terms that is concerning.
-- "concern": A brief explanation of why it is concerning.
+- "concern": A brief explanation of why it is severely concerning.
 
-Focus on sections that may negatively impact user rights or privacy, such as:
+Concentrate on sections that involve significant privacy violations or limitations of user rights, such as:
 
-1. Data Collection: Any invasive or excessive data collection practices.
-2. Data Usage: Any use of data that could compromise privacy or security.
-3. Data Sharing: Sharing data with third parties that may violate user expectations.
-4. User Rights: Clauses that limit user rights or impose unreasonable restrictions.
-5. Retention: Terms that involve retaining user data for an unusually long time.
-6. Waiving Rights: Any waivers of important legal rights.
-7. Limitation of Liability: Clauses that excessively limit the company's liability.
-8. Mandatory Arbitration: Terms that require arbitration and limit legal recourse.
-9. Unilateral Changes: Terms allowing the company to change the agreement without notice.
+1. **Excessive Data Collection**: Collection of sensitive personal information without clear justification.
+2. **Unrestricted Data Usage**: Use of data in ways that could seriously compromise privacy, such as selling personal data to third parties.
+3. **Data Sharing Without Consent**: Sharing data with third parties without user consent or in ways that violate user expectations.
+4. **Severe Limitation of User Rights**: Clauses that prevent users from accessing, modifying, or deleting their own data.
+5. **Unreasonable Data Retention**: Retaining user data indefinitely without valid reason.
+6. **Waiving Legal Rights**: Any waivers of important legal rights, such as the right to sue or join class-action lawsuits.
+7. **Excessive Limitation of Liability**: Clauses that absolve the company of liability even in cases of gross negligence or misconduct.
+8. **Mandatory Arbitration with Unfair Terms**: Arbitration clauses that unfairly limit legal recourse or are heavily biased towards the company.
+9. **Unilateral Agreement Changes**: Terms allowing the company to change the agreement at any time without notice, especially if changes affect user rights.
 
-Ignore any benign or standard terms that are commonly acceptable.
+Ignore any standard or minor terms that are commonly acceptable or not significantly detrimental to the user.
 
 **Important:** Only provide the JSON array in your response. Do not include any explanations or additional text.
 
@@ -104,8 +104,8 @@ Ignore any benign or standard terms that are commonly acceptable.
 [
   {
     "section": "Section 4.2",
-    "quote": "We reserve the right to share your data with third parties without your consent.",
-    "concern": "Allows data sharing without user consent, violating privacy expectations."
+    "quote": "We reserve the right to share your personal data, including financial information, with third parties for any purpose.",
+    "concern": "Allows unrestricted sharing of sensitive personal data without user consent, posing a severe privacy risk."
   }
 ]
 
@@ -120,7 +120,7 @@ ${chunkText}`;
         {
           role: "system",
           content:
-            "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+            "You are a legal expert specializing in identifying severely problematic clauses in Terms of Use documents.",
         },
         {
           role: "user",
