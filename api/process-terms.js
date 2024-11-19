@@ -82,39 +82,27 @@ async function processChunk(chunkText, model, maxOutputTokens, chunkNumber = nul
   try {
     console.log(`Preparing prompt for chunk ${chunkNumber || ''}`);
     // Prepare the prompt
-    const prompt = `As a legal expert reviewing a Terms of Use document, please identify and summarize only the problematic or concerning sections of the following ${
-      chunkNumber ? `chunk ${chunkNumber} of the Terms of Use` : "Terms of Use"
-    }. For each concern, provide:
+    const prompt = `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, or impose unreasonable restrictions. Ignore standard terms that are commonly acceptable.
+
+For each concern, provide the following in a JSON array format:
 
 - "section": The section name or number, if available.
 - "quote": The exact quote from the Terms that is concerning.
-- "concern": A brief explanation of why it is concerning.
+- "concern": A brief explanation of why it might deter users from signing up.
 
-Focus on sections that may negatively impact user rights or privacy, such as:
+**Important Instructions:**
 
-1. Data Collection: Any invasive or excessive data collection practices.
-2. Data Usage: Any use of data that could compromise privacy or security.
-3. Data Sharing: Sharing data with third parties that may violate user expectations.
-4. User Rights: Clauses that limit user rights or impose unreasonable restrictions.
-5. Retention: Terms that involve retaining user data for an unusually long time.
-6. Waiving Rights: Any waivers of important legal rights.
-7. Limitation of Liability: Clauses that excessively limit the company's liability.
-8. Mandatory Arbitration: Terms that require arbitration and limit legal recourse.
-9. Unilateral Changes: Terms allowing the company to change the agreement without notice.
-
-Ignore any benign or standard terms that are commonly acceptable.
-
-**Important:** Only provide the JSON array in your response. Do not include any explanations or additional text.
-
-**Ensure the JSON is properly formatted and valid.**
+- **Output only the JSON array**. Do not include any explanations or additional text.
+- **Ensure the JSON is properly formatted and valid**.
+- **Do not mention sections that are not problematic**.
 
 **Example response:**
 
 [
   {
     "section": "Section 4.2",
-    "quote": "We reserve the right to share your data with third parties without your consent.",
-    "concern": "Allows data sharing without user consent, violating privacy expectations."
+    "quote": "We reserve the right to share your personal data with third parties without your consent.",
+    "concern": "Allows sharing of personal data without consent, which may violate user privacy expectations."
   }
 ]
 
@@ -164,8 +152,10 @@ ${chunkText}`;
       // Try to fix the JSON
       const fixedJSON = fixJSON(responseContent);
       if (fixedJSON) {
+        console.log("Fixed JSON successfully.");
         return fixedJSON;
       } else {
+        console.error("Failed to parse and fix JSON from OpenAI response.");
         throw new Error("Failed to parse and fix JSON from OpenAI response.");
       }
     }
@@ -185,14 +175,21 @@ function fixJSON(jsonString) {
     const jsonArrayString = jsonString.match(/\[.*\]/s)[0];
 
     // Replace smart quotes with regular quotes
-    const sanitizedString = jsonArrayString
+    let sanitizedString = jsonArrayString
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'");
+
+    // Replace single quotes with double quotes
+    sanitizedString = sanitizedString.replace(/'/g, '"');
 
     // Remove any invalid control characters
     const cleanedString = sanitizedString.replace(/[\u0000-\u001F]+/g, "");
 
-    const parsedJSON = JSON.parse(cleanedString);
+    // Remove extra commas
+    const noExtraCommas = cleanedString.replace(/,\s*}/g, '}').replace(/,\s*]/g, ']');
+
+    // Attempt to parse the cleaned JSON string
+    const parsedJSON = JSON.parse(noExtraCommas);
     return parsedJSON;
   } catch (error) {
     console.error("Failed to fix JSON:", error);
