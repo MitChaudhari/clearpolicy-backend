@@ -18,13 +18,18 @@ if (!process.env.OPENAI_API_KEY) {
   console.error("Error: OPENAI_API_KEY is not set in environment variables.");
 }
 
+// Token limits for each model
+const TOKEN_LIMITS = {
+  "gpt-4o-mini": { contextWindow: 128000, maxOutputTokens: 16384 }, // GPT-4o-mini
+};
+
 // Function to process a single chunk of text using OpenAI's function calling
 async function processChunk(chunkText) {
   try {
     console.log(`Processing chunk...`);
 
-    const model = "gpt-4"; // Use a model that supports function calling
-    const maxOutputTokens = 1000; // Limit output tokens to reduce processing time
+    const model = "gpt-4o-mini"; // Use gpt-4o-mini as per your request
+    const { maxOutputTokens } = TOKEN_LIMITS[model];
 
     // Prepare the messages
     const messages = [
@@ -70,8 +75,6 @@ ${chunkText}`,
     ];
 
     console.log("Sending request to OpenAI API...");
-    const startTime = Date.now();
-
     // Make the OpenAI API request with function calling
     const completion = await openai.chat.completions.create({
       model: model,
@@ -81,9 +84,6 @@ ${chunkText}`,
       max_tokens: maxOutputTokens,
       temperature: 0.0, // Set temperature to 0 for deterministic output
     });
-
-    const endTime = Date.now();
-    console.log(`OpenAI API call completed in ${(endTime - startTime) / 1000} seconds`);
 
     // Handle the response
     const responseMessage = completion.choices[0].message;
@@ -178,10 +178,7 @@ export default cors(async function handler(req, res) {
 
     console.log("Received chunk content.");
 
-    const processingStartTime = Date.now();
     const concerns = await processChunk(chunkContent);
-    const processingEndTime = Date.now();
-    console.log(`Chunk processed in ${(processingEndTime - processingStartTime) / 1000} seconds`);
 
     console.log('Sending response with concerns');
     res.status(200).json({ concerns });
