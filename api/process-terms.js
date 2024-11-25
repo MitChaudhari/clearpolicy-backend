@@ -77,87 +77,98 @@ async function summarizePolicy(termsText) {
   }
 }
 
-// Function to process a single chunk of text
+// Function to process a single chunk of text using OpenAI's function calling
 async function processChunk(chunkText, model, maxOutputTokens, chunkNumber = null) {
   try {
-    console.log(`Preparing prompt for chunk ${chunkNumber || ''}`);
-    // Prepare the prompt
-    const prompt = `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, or impose unreasonable restrictions. Ignore standard terms that are commonly acceptable.
+    console.log(`Preparing to process chunk ${chunkNumber || ''}`);
 
-For each concern, provide the following in a JSON array format:
+    // Prepare the messages
+    const messages = [
+      {
+        role: "system",
+        content:
+          "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
+      },
+      {
+        role: "user",
+        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, or impose unreasonable restrictions. Ignore standard terms that are commonly acceptable.
 
-- "section": The section name or number, if available.
-- "quote": The exact quote from the Terms that is concerning.
-- "concern": A brief explanation of why it might deter users from signing up.
+Please extract the concerns from the following ${chunkNumber ? `chunk ${chunkNumber}` : "Terms of Use"}:
 
-**Important Instructions:**
+${chunkText}`,
+      },
+    ];
 
-- **Output only the JSON array**. Do not include any explanations or additional text.
-- **Ensure the JSON is properly formatted and valid**.
-- **Do not mention sections that are not problematic**.
-
-**Example response:**
-
-[
-  {
-    "section": "Section 4.2",
-    "quote": "We reserve the right to share your personal data with third parties without your consent.",
-    "concern": "Allows sharing of personal data without consent, which may violate user privacy expectations."
-  }
-]
-
-${chunkNumber ? `Chunk ${chunkNumber}` : "Terms of Use"}:
-
-${chunkText}`;
+    // Define the function schema
+    const functions = [
+      {
+        name: "extract_concerns",
+        description: "Extracts concerns from the Terms of Use.",
+        parameters: {
+          type: "object",
+          properties: {
+            concerns: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  section: { type: "string", description: "The section name or number, if available." },
+                  quote: { type: "string", description: "The exact quote from the Terms that is concerning." },
+                  concern: { type: "string", description: "A brief explanation of why it might deter users from signing up." }
+                },
+                required: ["section", "quote", "concern"]
+              }
+            }
+          },
+          required: ["concerns"]
+        }
+      }
+    ];
 
     console.log("Sending request to OpenAI API...");
-    // Make the OpenAI API request
+    // Make the OpenAI API request with function calling
     const completion = await openai.chat.completions.create({
       model: model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are a legal expert specializing in identifying problematic clauses in Terms of Use documents.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages: messages,
+      functions: functions,
+      function_call: { name: "extract_concerns" }, // Force the model to call the function
       max_tokens: maxOutputTokens,
       temperature: 0.0, // Set temperature to 0 for deterministic output
     });
 
-    // Extract and parse the completion content
-    let responseContent = completion.choices[0].message.content.trim();
+    // Handle the response
+    const responseMessage = completion.choices[0].message;
 
-    console.log("OpenAI API response:", responseContent);
+    if (responseMessage.function_call) {
+      const functionName = responseMessage.function_call.name;
+      const functionArgs = responseMessage.function_call.arguments;
 
-    // Attempt to extract JSON from the response
-    const jsonMatch = responseContent.match(/\[.*\]/s);
-    if (jsonMatch) {
-      responseContent = jsonMatch[0];
-    } else {
-      console.error("No JSON array found in OpenAI response.");
-      throw new Error("Failed to extract JSON array from OpenAI response.");
-    }
-
-    try {
-      const parsedConcerns = JSON.parse(responseContent);
-      return parsedConcerns;
-    } catch (parseError) {
-      console.error("Error parsing JSON from OpenAI response:", parseError);
-      console.error("Attempting to fix JSON...");
-      // Try to fix the JSON
-      const fixedJSON = fixJSON(responseContent);
-      if (fixedJSON) {
-        console.log("Fixed JSON successfully.");
-        return fixedJSON;
+      if (functionName === "extract_concerns") {
+        // Parse the function arguments
+        try {
+          const args = JSON.parse(functionArgs);
+          const concerns = args.concerns;
+          return concerns;
+        } catch (parseError) {
+          console.error("Error parsing function arguments:", parseError);
+          console.error("Function arguments:", functionArgs);
+          // Attempt to fix the JSON
+          const fixedArgs = fixJSON(functionArgs);
+          if (fixedArgs && fixedArgs.concerns) {
+            console.log("Fixed JSON successfully.");
+            return fixedArgs.concerns;
+          } else {
+            console.error("Failed to parse and fix function arguments.");
+            throw new Error("Failed to parse function arguments.");
+          }
+        }
       } else {
-        console.error("Failed to parse and fix JSON from OpenAI response.");
-        throw new Error("Failed to parse and fix JSON from OpenAI response.");
+        console.error(`Unexpected function called: ${functionName}`);
+        throw new Error(`Unexpected function called: ${functionName}`);
       }
+    } else {
+      console.error("No function call in OpenAI response.");
+      throw new Error("No function call in OpenAI response.");
     }
   } catch (error) {
     console.error(
@@ -171,11 +182,11 @@ ${chunkText}`;
 // Function to attempt to fix malformed JSON
 function fixJSON(jsonString) {
   try {
-    // Remove any trailing characters after the JSON array
-    const jsonArrayString = jsonString.match(/\[.*\]/s)[0];
+    // Remove any trailing characters after the JSON object
+    const jsonObjectString = jsonString.match(/\{.*\}/s)[0];
 
     // Replace smart quotes with regular quotes
-    let sanitizedString = jsonArrayString
+    let sanitizedString = jsonObjectString
       .replace(/[“”]/g, '"')
       .replace(/[‘’]/g, "'");
 
