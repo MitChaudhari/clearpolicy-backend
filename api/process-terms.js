@@ -44,7 +44,6 @@ async function processChunk(chunkText) {
 
 Please extract the most significant concern, only one concern from the following Terms of Use:
 
-
 ${chunkText}`,
       },
     ];
@@ -81,7 +80,7 @@ ${chunkText}`,
       model: model,
       messages: messages,
       functions: functions,
-      function_call: { name: "extract_concerns" }, // Force the model to call the function
+      tool_calls: { name: "extract_concerns" }, // Use tool_calls instead of function_call
       max_tokens: maxOutputTokens,
       temperature: 0.0, // Set temperature to 0 for deterministic output
     });
@@ -89,30 +88,30 @@ ${chunkText}`,
     // Handle the response
     const responseMessage = completion.choices[0].message;
 
-    if (responseMessage.function_call) {
-      const functionArgs = responseMessage.function_call.arguments;
+    if (responseMessage.tool_call) {
+      const toolArgs = responseMessage.tool_call.arguments;
 
       // Parse the function arguments
       try {
-        const args = JSON.parse(functionArgs);
+        const args = JSON.parse(toolArgs);
         const concerns = args.concerns || [];
         return concerns;
       } catch (parseError) {
-        console.error("Error parsing function arguments:", parseError);
-        console.error("Function arguments:", functionArgs);
+        console.error("Error parsing tool arguments:", parseError);
+        console.error("Tool arguments:", toolArgs);
         // Attempt to fix the JSON
-        const fixedArgs = fixJSON(functionArgs);
+        const fixedArgs = fixJSON(toolArgs);
         if (fixedArgs && fixedArgs.concerns) {
           console.log("Fixed JSON successfully.");
           return fixedArgs.concerns;
         } else {
-          console.error("Failed to parse and fix function arguments.");
-          throw new Error("Failed to parse function arguments.");
+          console.error("Failed to parse and fix tool arguments.");
+          throw new Error("Failed to parse tool arguments.");
         }
       }
     } else {
-      console.error("No function call in OpenAI response.");
-      throw new Error("No function call in OpenAI response.");
+      console.error("No tool call in OpenAI response.");
+      throw new Error("No tool call in OpenAI response.");
     }
   } catch (error) {
     console.error(
