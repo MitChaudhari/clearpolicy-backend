@@ -40,9 +40,10 @@ async function processChunk(chunkText) {
       },
       {
         role: "user",
-        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, impose unreasonable restrictions, or mention monetary values. Ignore standard terms that are commonly acceptable.
+        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify the single most important problematic clause in the provided text that could deter users from signing up for the service. Focus on concerns that significantly impact user rights or privacy, impose unreasonable restrictions, or involve monetary values. Choose the concern that would be most helpful for a user to make an informed decision.
 
-Please extract the concerns from the following Terms of Use:
+Please extract the most significant concern, only one concern from the following Terms of Use:
+
 
 ${chunkText}`,
       },
