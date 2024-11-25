@@ -28,7 +28,7 @@ async function processChunk(chunkText) {
   try {
     console.log(`Processing chunk...`);
 
-    const model = "gpt-4"; // Use a model that supports function calling
+    const model = "gpt-4o-mini"; // Use gpt-4o-mini as per your request
     const { maxOutputTokens } = TOKEN_LIMITS[model];
 
     // Prepare the messages
@@ -40,7 +40,7 @@ async function processChunk(chunkText) {
       },
       {
         role: "user",
-        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, or impose unreasonable restrictions, or many monetary value mentions. Ignore standard terms that are commonly acceptable.
+        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, impose unreasonable restrictions, or mention monetary values. Ignore standard terms that are commonly acceptable.
 
 Please extract the concerns from the following Terms of Use:
 
