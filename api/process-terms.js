@@ -40,7 +40,7 @@ async function processChunk(chunkText) {
       },
       {
         role: "user",
-        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, impose unreasonable restrictions, or mention monetary values. Ignore standard terms that are commonly acceptable.
+        content: `As a legal expert reviewing a Terms of Use document, your goal is to identify any problematic clauses that could deter users from signing up for the service. Focus only on the sections that may negatively impact user rights or privacy, impose unreasonable restrictions, or mention monetary values. Ignore standard terms that are commonly acceptable. For example "IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU FOR ALL DAMAGES, LOSSES AND CAUSES OF ACTION EXCEED ONE THOUSAND U.S. DOLLARS (US $1,000)" This is very conserning to user because of the money value. Something like this would be important to show.
 
 Please extract the concerns from the following Terms of Use:
 
